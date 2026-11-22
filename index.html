@@ -104,13 +104,8 @@ tr.r td:first-child{flex-basis:100%;font-weight:600}
 
 <section id="auth"><div class="box">
 <div class="brand"><div class="lg"><span data-i="cloud"></span></div>Arsip Sekolah</div>
-<p class="mu sm" style="margin:1.2rem 0 .2rem">Masuk untuk mengelola arsip kegiatan sekolah.</p>
-
-<label id="le">Email akun</label><input id="ue" type="email" placeholder="nama@sekolah.sch.id">
-<label>Kata sandi</label><input id="up" type="password" placeholder="Minimal 6 karakter" onkeydown="if(event.key==='Enter')submitAuth()">
-
-<div class="row"><button class="btn" id="ab" style="width:100%" onclick="submitAuth()">Masuk</button></div>
-<p class="mu sm">Login admin lokal: wahyuwrdn110@gmail.com · kata sandi: admin123</p>
+<p class="mu sm" style="margin:1.2rem 0 .2rem">Masuk menggunakan akun Google yang telah diizinkan admin.</p>
+<div id="googleSignIn"></div><p class="mu sm" id="sharedStatus" role="status"></p>
 </div></section>
 
 <div id="app" class="shell hide">
@@ -123,7 +118,7 @@ tr.r td:first-child{flex-basis:100%;font-weight:600}
 <button class="nav" data-v="add"><span data-i="upload"></span><span class="lb">Tambah Arsip Baru</span><span class="sh">Tambah</span></button>
 <button class="nav" data-v="find"><span data-i="search"></span><span class="lb">Cari &amp; Lihat Arsip</span><span class="sh">Cari</span></button>
 <button class="nav" data-v="settings"><span data-i="settings"></span><span class="lb">Pengaturan</span><span class="sh">Atur</span></button>
-<div class="stor"><b>EMAIL DRIVE PENYIMPANAN</b><em id="sde">Belum terhubung</em><div class="b"><i id="sb" style="width:10%"></i></div><span id="st"></span>
+<div class="stor"><b>DRIVE PENYIMPANAN</b><em id="sde">Belum terhubung</em><div class="b"><i id="sb" style="width:10%"></i></div><span id="st"></span>
 <button class="out" onclick="logout()" style="margin-top:.8rem"><span data-i="logout"></span>Keluar</button></div>
 </aside>
 <main>
@@ -131,246 +126,221 @@ tr.r td:first-child{flex-basis:100%;font-weight:600}
 <section id="find" class="hide"><h1>Cari &amp; Lihat Arsip</h1><div class="rule"></div>
 <div class="filters"><select id="fy" onchange="render()"></select>
 <select id="fc" onchange="render()"><option value="">Semua kategori</option><option value="Pembangunan">Pembangunan</option><option value="Kegiatan_Sekolah">Kegiatan Sekolah</option></select></div>
-<div class="tw"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Tanggal</th><th>Foto / Progres</th></tr></thead><tbody id="tb"></tbody></table></div></section>
+<div class="tw"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Tanggal</th><th>Berkas / Progres</th></tr></thead><tbody id="tb"></tbody></table></div></section>
 </main></div>
 
 <div id="modal" class="hide" onclick="if(event.target===this)closeM()"><div class="card" id="mb"></div></div>
 <div id="toast" class="hide"></div>
+<script>window.ARSIP_CONFIG=window.ARSIP_CONFIG||{googleClientId:'',apiUrl:''};</script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 const $=id=>document.getElementById(id);
-const SHARED_MODE=!!(window.google&&google.script&&google.script.run);
+const SHARED_MODE=location.hostname==='script.google.com'||location.hostname==='script.googleusercontent.com'||(typeof google!=='undefined'&&!!google.script&&!!google.script.run);
 let AUTH_TOKEN='';
 const P={cloud:'<path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18z"/>',plus:'<path d="M12 5v14M5 12h14"/>',home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',upload:'<path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',logout:'<path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',build:'<path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3"/>',cap:'<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',dl:'<path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/>',check:'<path d="m5 12 5 5 9-10"/>',save:'<path d="M5 3h11l3 3v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/>',back:'<path d="m12 19-7-7 7-7M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>'};
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
 document.querySelectorAll('[data-i]').forEach(e=>{e.innerHTML=ic(e.dataset.i)});
-const seed=[{id:1,kind:'Pembangunan',nm:'Renovasi Ruang Kelas 7A',dt:'2025-08-12',ds:'Perbaikan atap, lantai, dan pengecatan ulang.',pr:70,n:4},
-{id:2,kind:'Kegiatan_Sekolah',nm:'Upacara HUT RI ke-80',dt:'2025-08-17',ds:'Upacara bendera dan lomba antar kelas.',pr:null,n:12},
-{id:3,kind:'Kegiatan_Sekolah',nm:'Wisuda Angkatan 2024',dt:'2024-06-20',ds:'Pelepasan siswa kelas 9 di aula sekolah.',pr:null,n:30},
-{id:4,kind:'Pembangunan',nm:'Pembangunan Laboratorium IPA',dt:'2024-03-05',ds:'Gedung lab baru dua lantai.',pr:100,n:9}];
-const DEFAULT_ADMIN_EMAIL='wahyuwrdn110@gmail.com';
-let CONFIG={adminEmail:DEFAULT_ADMIN_EMAIL,googleClientId:'',driveEmail:''};
-let DB=seed,users=[],kind='',me=null;
-try{
-const savedConfig=localStorage.getItem('ars_config');if(savedConfig)CONFIG={...CONFIG,...JSON.parse(savedConfig)};
-const savedDB=localStorage.getItem('arsip4');if(savedDB)DB=JSON.parse(savedDB);
-users=JSON.parse(localStorage.getItem('ars_users')||'[]')
-}catch(e){console.error('Gagal membaca data aplikasi dari browser.',e)}
-let admin=users.find(u=>u.isAdmin||u.email===DEFAULT_ADMIN_EMAIL);
-if(!admin){admin={name:'Admin Sekolah',email:CONFIG.adminEmail,pass:'admin123',isAdmin:true,drive:CONFIG.driveEmail};users.unshift(admin)}
-admin.email=CONFIG.adminEmail;admin.isAdmin=true;admin.drive=CONFIG.driveEmail||'';
-const persist=()=>{try{localStorage.setItem('arsip4',JSON.stringify(DB));localStorage.setItem('ars_users',JSON.stringify(users));localStorage.setItem('ars_config',JSON.stringify(CONFIG));return true}catch(e){console.error('Gagal menyimpan data aplikasi di browser.',e);toast('Penyimpanan browser penuh atau tidak tersedia.',1);return false}};
+const CONFIG=window.ARSIP_CONFIG||{googleClientId:'',apiUrl:''};
+let DB=[],kind='',me=null,editingId=null;
+let CONNECTION={spreadsheet:false,drive:false};
 const yr=d=>d.slice(0,4),lab=k=>k==='Pembangunan'?'Pembangunan':'Kegiatan Sekolah',okMail=s=>/^\S+@\S+\.\S+$/.test(s);
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-/* Registrasi & Login (akun aplikasi) */
-function submitAuth(){const e=$('ue').value.trim().toLowerCase(),p=$('up').value;
-if(!okMail(e))return toast('Format email tidak valid',1);if(p.length<6)return toast('Sandi minimal 6 karakter',1);
-const u=users.find(x=>x.email===e&&x.pass===p);if(!u)return toast('Email atau sandi salah',1);
-me=u;$('who').textContent=u.name;$('av').textContent=u.name[0].toUpperCase();$('auth').classList.add('hide');$('app').classList.remove('hide');go('dash')}
-function logout(){if(SHARED_MODE){if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();AUTH_TOKEN='';location.reload();return}me=null;$('app').classList.add('hide');$('auth').classList.remove('hide');$('up').value=''}
+function logout(){AUTH_TOKEN='';me=null;DB=[];if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();location.reload()}
 
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
 function go(v,f){['dash','add','find','settings'].forEach(x=>$(x).classList.toggle('hide',x!==v));
 document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
 if(v==='dash')dash();if(v==='add')addView();if(v==='settings')settingsView();if(v==='find'){years();if(f){$('fy').value=f.y||'';$('fc').value=f.k||''}render()}
-const n=DB.reduce((a,x)=>a+x.n,0);$('sb').style.width=Math.min(95,10+n)+'%';$('st').textContent=n+' foto tersimpan';
-$('sde').textContent=me.drive||'Belum terhubung';window.scrollTo(0,0)}
+const n=DB.reduce((a,x)=>a+(Number(x.n)||0),0);$('sb').style.width=Math.min(95,10+n)+'%';
+$('sde').textContent=CONNECTION.drive?'Drive sekolah terhubung':'Drive belum terhubung';$('st').textContent=n+' berkas tersimpan';window.scrollTo(0,0)}
 
-/* Email Drive penyimpanan (terpisah dari akun login) */
-function accounts(){const driveLabel=SHARED_MODE?'Drive bersama sekolah':(me.drive||'Belum terhubung');return `<div class="two"><div class="acc"><small>AKUN LOGIN</small><b>${ic('user')} ${esc(me.email)}</b></div>
-<div class="acc ${SHARED_MODE||me.drive?'ok':''}"><small>DRIVE PENYIMPANAN</small><b>${ic('cloud')} ${esc(driveLabel)}</b></div></div>`}
-function driveForm(){return `<b>Hubungkan Google Drive</b><p class="mu sm">Login Google akan meminta izin untuk membuat folder dan menyimpan berkas arsip ke Drive akun yang Anda pilih. Email Drive boleh berbeda dari email admin.</p>
-<div class="row"><button class="btn" id="cn" onclick="connect()">${ic('link')}${me.drive?'Ganti akun Google Drive':'Login &amp; hubungkan Drive'}</button></div>`}
-function getGoogleToken(promptAccount){
-return new Promise((resolve,reject)=>{
-if(!CONFIG.googleClientId)return reject(new Error('Isi Google OAuth Client ID pada Pengaturan terlebih dahulu.'));
-if(!window.google||!google.accounts||!google.accounts.oauth2)return reject(new Error('Layanan login Google belum termuat. Periksa koneksi internet lalu muat ulang halaman.'));
-const client=google.accounts.oauth2.initTokenClient({client_id:CONFIG.googleClientId,scope:'openid email https://www.googleapis.com/auth/drive.file',
-callback:r=>r.error?reject(new Error(r.error_description||r.error)):resolve(r.access_token),
-error_callback:e=>reject(new Error(e.message||'Login Google dibatalkan atau gagal.'))});
-client.requestAccessToken({prompt:promptAccount?'select_account':'',login_hint:CONFIG.driveEmail||undefined})
-})
-}
-async function connectedGoogleAccount(promptAccount){
-const token=await getGoogleToken(promptAccount);
-const response=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+token}});
-if(!response.ok)throw new Error('Tidak dapat membaca akun Google. Pastikan izin email disetujui.');
-const account=await response.json();
-if(!account.email)throw new Error('Google tidak mengembalikan alamat email akun.');
-return {token,email:account.email.toLowerCase()}
-}
-async function connect(){
-const b=$('cn');if(b){b.disabled=true;b.textContent='Menghubungkan…'}
-try{const account=await connectedGoogleAccount(true);CONFIG.driveEmail=account.email;admin.drive=account.email;if(me.isAdmin)me.drive=account.email;if(!persist()){if(b){b.disabled=false;b.innerHTML=ic('link')+'Coba hubungkan lagi'}return}toast('Google Drive terhubung: '+account.email);const v=$('add').classList.contains('hide')?'settings':'add';go(v)}
-catch(e){console.error('Koneksi Google Drive gagal.',e);toast(e.message||'Koneksi Google Drive gagal.',1);if(b){b.disabled=false;b.innerHTML=ic('link')+'Coba hubungkan lagi'}}
-}
+/* Status dan izin disediakan backend, bukan dipercaya dari browser. */
+function accounts(){return `<div class="two"><div class="acc"><small>AKUN LOGIN</small><b>${ic('user')} ${esc(me.email)}</b></div>
+<div class="acc ${CONNECTION.drive&&CONNECTION.spreadsheet?'ok':''}"><small>DATABASE &amp; DRIVE</small><b>${ic('cloud')} ${CONNECTION.spreadsheet&&CONNECTION.drive?'Terhubung':'Periksa koneksi backend'}</b></div></div>`}
 function settingsView(){
 const canEdit=me.isAdmin;
-if(SHARED_MODE){
  $('settings').innerHTML=`<h1>Pengaturan</h1><div class="rule"></div>${accounts()}
 <div class="card"><b>Penyimpanan bersama sekolah</b><p class="mu sm">Daftar arsip tersimpan bersama. Guru yang emailnya disetujui admin dapat menambah arsip dan mengunduh berkas Drive.</p>
 <p class="mu sm">Akun Anda: ${esc(me.email)}</p>
 ${canEdit?`<div class="rule" style="margin-top:1.2rem"></div><b>Email administrator aplikasi</b><label for="adminEmail">Email admin</label><input id="adminEmail" type="email" value="${esc(CONFIG.adminEmail)}" placeholder="admin@gmail.com">
 <label for="authorizedEmails">Email guru yang diizinkan (pisahkan dengan baris baru atau koma)</label><textarea id="authorizedEmails" rows="5" placeholder="guru1@gmail.com&#10;guru2@gmail.com">${esc((CONFIG.authorizedEmails||[]).filter(email=>email!==CONFIG.adminEmail).join('\n'))}</textarea>
-<p class="mu sm">Admin selalu diizinkan. Menyimpan daftar akan memberi akses lihat ke folder Drive bagi email yang ditambahkan dan mencabut akses aplikasi/Drive bagi email yang dihapus.</p>
+<p class="mu sm">Admin selalu diizinkan. Perubahan izin diperiksa kembali oleh backend pada setiap permintaan.</p>
 <div class="row"><button class="btn" onclick="saveSettings()">${ic('save')}Simpan admin &amp; akses guru</button></div>`:'<p class="mu sm">Pengaturan administrator hanya dapat diubah admin aplikasi.</p>'}
 </div><p class="mu sm">Gunakan akun Google yang disetujui admin. Keluar lalu masuk lagi untuk berganti akun.</p>`;
 return
 }
-$('settings').innerHTML=`<h1>Pengaturan</h1><div class="rule"></div>${accounts()}
-${canEdit?`<div class="card"><b>Email administrator</b><p class="mu sm">Email ini digunakan sebagai akun admin aplikasi pada browser ini.</p>
-<label for="adminEmail">Email admin</label><input id="adminEmail" type="email" value="${esc(CONFIG.adminEmail)}" placeholder="wahyuwrdn110@gmail.com">
-<div class="row"><button class="btn" onclick="saveSettings()">${ic('save')}Simpan pengaturan</button></div>
-<div class="rule" style="margin-top:1.2rem"></div><b>Google Drive</b><p class="mu sm">Masukkan OAuth Client ID dari Google Cloud Console. Jangan masukkan Client Secret di aplikasi ini.</p>
-<label for="googleClientId">Google OAuth Client ID</label><input id="googleClientId" value="${esc(CONFIG.googleClientId)}" placeholder="123456789-abc.apps.googleusercontent.com" autocomplete="off">
-<p class="mu sm">Google Cloud: aktifkan Google Drive API, siapkan OAuth consent screen, lalu buat OAuth Client ID tipe Web application. Masukkan origin GitHub Pages (contoh: https://nama-akun.github.io, tanpa path) ke Authorized JavaScript origins.</p>
-${me.drive?`<p><b>Terhubung sebagai:</b> ${esc(me.drive)}</p><button class="btn gh" onclick="disconnectDrive()">${ic('x')}Putuskan akun Drive</button>`:driveForm()}
-</div>`:`<div class="card">Pengaturan administrator hanya dapat diubah oleh admin aplikasi.</div>`}
-<p class="mu sm">Konfigurasi dan data tersimpan di browser ini (localStorage), bukan di GitHub atau server bersama. Setiap perangkat/browser perlu mengatur koneksi Drive sendiri. Aplikasi statis ini tidak menyediakan autentikasi/penyimpanan bersama yang aman untuk banyak pengguna.</p>`
-}
 function saveSettings(){
-if(SHARED_MODE){saveSharedSettings();return}
-const email=$('adminEmail').value.trim().toLowerCase(),clientId=$('googleClientId').value.trim();
-if(!okMail(email))return toast('Masukkan email administrator yang valid.',1);
-if(clientId&&!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(clientId))return toast('Format Google OAuth Client ID tidak valid.',1);
-const oldEmail=CONFIG.adminEmail;CONFIG.adminEmail=email;CONFIG.googleClientId=clientId;
-admin.email=email;admin.isAdmin=true;users.forEach(u=>{if(u.email===oldEmail&&u.isAdmin)u.email=email});
-if(me.isAdmin){me.email=email;$('who').textContent=email;$('av').textContent=email[0].toUpperCase()}
-if(!persist())return;toast('Pengaturan berhasil disimpan.');settingsView()
+saveSharedSettings()
 }
 async function saveSharedSettings(){
 const email=$('adminEmail').value.trim().toLowerCase();
 const authorizedEmails=$('authorizedEmails').value.split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
 if(!okMail(email)||authorizedEmails.some(x=>!okMail(x)))return toast('Periksa email admin dan daftar email guru.',1);
 try{
-const result=await rpc('updateSharedSettings',AUTH_TOKEN,{adminEmail:email,authorizedEmails});
+const result=await request('updateSharedSettings',{settings:{adminEmail:email,authorizedEmails}});
 CONFIG.adminEmail=result.adminEmail;CONFIG.authorizedEmails=result.authorizedEmails;me.isAdmin=result.isAdmin;
+if(!me.isAdmin){toast('Admin diperbarui. Silakan masuk kembali menggunakan akun baru.');logout();return}
 toast('Pengaturan admin dan akses guru berhasil disimpan.');settingsView()
 }catch(e){toast(e.message||'Gagal memperbarui pengaturan bersama.',1)}
 }
-function disconnectDrive(){CONFIG.driveEmail='';admin.drive='';if(me.isAdmin)me.drive='';if(persist())settingsView()}
 
 /* Halaman Utama */
 const ico=x=>`<span class="fi ${x.kind==='Pembangunan'?'p':'k'}">${ic(x.kind==='Pembangunan'?'build':'cap')}</span>`;
 function dash(){const ys=[...new Set(DB.map(x=>yr(x.dt)))].sort().reverse().slice(0,3),fo=[];
 ys.forEach(y=>['Pembangunan','Kegiatan_Sekolah'].forEach(k=>{const c=DB.filter(x=>yr(x.dt)===y&&x.kind===k).length;if(c)fo.push([y,k,c])}));
-$('dash').innerHTML=`<h1>Halaman Utama</h1><div class="rule"></div>${accounts()}
+$('dash').innerHTML=`<h1>Halaman Utama <button class="btn gh" style="float:right;font-size:.8rem;padding:.45rem .7rem" onclick="refreshArchives()">Perbarui data</button></h1><div class="rule"></div>${accounts()}
+<div class="acts"><div class="acc"><small>SELURUH ARSIP</small><b>${DB.length}</b></div><div class="acc"><small>KEGIATAN SEKOLAH</small><b>${DB.filter(x=>x.kind==='Kegiatan_Sekolah').length}</b></div>
+<div class="acc"><small>PEMBANGUNAN</small><b>${DB.filter(x=>x.kind==='Pembangunan').length}</b></div><div class="acc"><small>FOTO &amp; DOKUMEN</small><b>${DB.reduce((n,x)=>n+(Number(x.n)||0),0)}</b></div></div>
 <div class="acts"><div class="fold hot" onclick="go('add')"><small>MENU 1</small><b>${ic('plus')}Tambah Arsip Baru</b><span>Unggah dokumentasi ke Google Drive</span></div>
 <div class="fold" onclick="go('find')"><small>MENU 2</small><b>${ic('search')}Cari &amp; Lihat Arsip</b><span>Filter tahun / kategori</span></div></div>
-<h4>Quick Access</h4><div class="qa">${fo.slice(0,4).map(([y,k,c])=>`<div class="fold" onclick="go('find',{y:'${y}',k:'${k}'})"><small>FOLDER</small><b>${ic('folder')}/${y}/${k}/</b><span>${c} arsip</span></div>`).join('')}</div>
-<h4>Arsip Terbaru</h4><div class="tw"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Tanggal</th></tr></thead><tbody>${DB.slice(0,4).map(x=>`<tr class="r" onclick="view(${x.id})"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${x.dt}</td></tr>`).join('')}</tbody></table></div>`}
+<h4>Quick Access</h4><div class="qa">${fo.slice(0,4).map(([y,k,c])=>`<div class="fold" onclick="go('find',{y:'${y}',k:'${k}'})"><small>FOLDER</small><b>${ic('folder')}/${y}/${lab(k)}/</b><span>${c} arsip</span></div>`).join('')}</div>
+<h4>Arsip Terbaru</h4><div class="tw"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Tanggal</th></tr></thead><tbody>${DB.slice(0,4).map(x=>`<tr class="r" onclick="view('${esc(x.id)}')"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${x.dt}</td></tr>`).join('')||'<tr><td class="mu">Belum ada arsip.</td></tr>'}</tbody></table></div>`}
 
-/* 1. Tambah Arsip: Koneksi Drive → Jenis → Detail → Folder → Simpan → Notifikasi */
-const hd=(a,b,c)=>`<h1>Tambah Arsip Baru</h1><div class="rule"></div><div class="steps"><span class="${a}">1 Koneksi Drive</span><span class="${b}">2 Jenis</span><span class="${c}">3 Detail</span></div>`;
-function addView(){kind='';
-if(!SHARED_MODE&&!me.drive){$('add').innerHTML=hd('on','','')+accounts()+`<div class="card">${driveForm()}</div>`;return}
-$('add').innerHTML=hd('','on','')+accounts()+`<div class="card"><b>Pilih jenis kegiatan</b><div class="seg">
+/* 1. Tambah Arsip: pilih kategori, isi metadata, lalu kirim ke backend. */
+const hd=(a,b,c)=>`<h1>Tambah Arsip Baru</h1><div class="rule"></div><div class="steps"><span class="${a}">1 Jenis</span><span class="${b}">2 Detail</span><span class="${c}">3 Simpan</span></div>`;
+function addView(){kind='';editingId=null;
+$('add').innerHTML=hd('on','','')+accounts()+`<div class="card"><b>Pilih jenis kegiatan</b><div class="seg">
 <button onclick="pick('Pembangunan')"><b>${ic('build')}Pembangunan</b><span class="mu sm">Proyek &amp; progres 0–100%</span></button>
 <button onclick="pick('Kegiatan_Sekolah')"><b>${ic('cap')}Kegiatan Sekolah</b><span class="mu sm">Acara &amp; dokumentasi</span></button></div></div>`}
 function pick(k){kind=k;const p=k==='Pembangunan';
-$('add').innerHTML=hd('','','on')+`<div class="card"><b>${p?'Detail Proyek & Foto Progres (0%–100%)':'Detail Acara & Foto Dokumentasi'}</b>
-<label>${p?'Nama proyek':'Nama acara'}</label><input id="nm"><label>Tanggal</label><input id="dt" type="date" value="${new Date().toISOString().slice(0,10)}" onchange="updPath()">
+$('add').innerHTML=hd('','on','')+`<div class="card"><b>${p?'Detail Proyek & Foto Progres (0%–100%)':'Detail Acara & Foto Dokumentasi'}</b>
+<label>${p?'Nama proyek':'Nama acara'}</label><input id="nm"><label>Tanggal</label><input id="dt" type="date" value="${today()}" onchange="updPath()">
 <label>Deskripsi</label><textarea id="ds" rows="2"></textarea>
-${p?`<label>Progres: <span id="pv">0</span>%</label><input type="range" id="pr" min="0" max="100" step="5" value="0" oninput="pv.textContent=this.value">`:''}
-<label>${p?'Foto progres':'Foto dokumentasi'}</label><input type="file" id="fo" accept="image/*" multiple>
+${p?`<label>Progres: <span id="pv">0</span>%</label><input type="range" id="pr" min="0" max="100" step="1" value="0" oninput="pv.textContent=this.value">`:''}
+<label>Foto atau dokumen</label><input type="file" id="fo" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" multiple>
 <div class="path" id="path"></div>
 <div class="row"><button class="btn" onclick="save()">${ic('save')}Simpan ke Drive &amp; Database</button><button class="btn gh" onclick="addView()">${ic('back')}Kembali</button></div></div>`;updPath()}
-function updPath(){$('path').textContent=(SHARED_MODE?'Drive bersama sekolah':me.drive)+' › /'+($('dt').value||'Tahun').slice(0,4)+'/'+kind+'/'}
-async function driveRequest(url,token,options){
-const response=await fetch(url,{...options,headers:{Authorization:'Bearer '+token,...(options&&options.headers||{})}});
-const result=await response.json().catch(()=>({}));
-if(!response.ok)throw new Error(result.error&&result.error.message||`Google Drive menolak permintaan (${response.status}).`);
-return result
-}
-async function findOrCreateFolder(name,parent,token){
-const q=`name='${name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parent}' in parents and trashed=false`;
-const query=new URLSearchParams({q,fields:'files(id,name)',pageSize:'1'});
-const found=await driveRequest('https://www.googleapis.com/drive/v3/files?'+query,token);
-if(found.files&&found.files.length)return found.files[0].id;
-const folder=await driveRequest('https://www.googleapis.com/drive/v3/files?fields=id',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:[parent]})});
-return folder.id
-}
-async function uploadToDrive(file,parent,token){
-const metadata={name:file.name,parents:[parent]},boundary='arsip_'+Math.random().toString(16).slice(2);
-const body=new Blob(['--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',JSON.stringify(metadata),'\r\n--'+boundary+'\r\nContent-Type: '+(file.type||'application/octet-stream')+'\r\n\r\n',file,'\r\n--'+boundary+'--']);
-return driveRequest('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',token,{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+boundary},body})
-}
+function updPath(){$('path').textContent='Drive bersama sekolah › /'+($('dt').value||'Tahun').slice(0,4)+'/'+(kind==='Kegiatan_Sekolah'?'Kegiatan Sekolah':'Pembangunan')+'/'}
 async function save(){
 const nm=$('nm').value.trim(),dt=$('dt').value;if(!nm||!dt)return toast('Nama & tanggal wajib diisi',1);
-if(SHARED_MODE){saveSharedArchive(nm,dt);return}
-const button=$('add').querySelector('.btn');if(button){button.disabled=true;button.textContent='Menyimpan…'}
-try{
-const account=await connectedGoogleAccount(false);
-if(account.email!==me.drive)throw new Error(`Akun Google yang aktif (${account.email}) berbeda dari Drive penyimpanan (${me.drive}). Hubungkan akun yang benar di Pengaturan.`);
-const fs=[...$('fo').files],root=await findOrCreateFolder('Arsip Sekolah','root',account.token);
-const yearFolder=await findOrCreateFolder(yr(dt),root,account.token);
-const categoryFolder=await findOrCreateFolder(kind==='Kegiatan_Sekolah'?'Kegiatan Sekolah':'Pembangunan',yearFolder,account.token);
-const driveFiles=[];
-for(const file of fs)driveFiles.push(await uploadToDrive(file,categoryFolder,account.token));
-const id=Date.now();
-DB.unshift({id,kind,nm,dt,ds:$('ds').value.trim(),pr:kind==='Pembangunan'?+$('pr').value:null,n:driveFiles.length,driveFiles});
-if(!persist()){if(button){button.disabled=false;button.innerHTML=ic('save')+'Simpan ke Drive &amp; Database'}return}toast(fs.length?'Arsip dan foto berhasil disimpan ke Google Drive.':'Arsip berhasil disimpan.');go('dash')
-}catch(e){console.error('Penyimpanan ke Google Drive gagal.',e);toast(e.message||'Gagal menyimpan ke Google Drive.',1);if(button){button.disabled=false;button.innerHTML=ic('save')+'Simpan ke Drive &amp; Database'}}
+const progress=kind==='Pembangunan'?Number($('pr').value):null;
+if(kind==='Pembangunan'&&(!Number.isInteger(progress)||progress<0||progress>100))return toast('Progres harus 0–100%.',1);
+const files=[...$('fo').files];
+if(files.length>10||files.reduce((n,f)=>n+f.size,0)>10*1024*1024)return toast('Maksimal 10 berkas dan total ukuran 10 MB.',1);
+if(files.some(f=>!['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(f.type)))return toast('Tipe berkas tidak diizinkan.',1);
+await saveSharedArchive(nm,dt,files,progress)
 }
 async function fileAsBase64(file){
 return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type,data:String(reader.result).split(',')[1]||''});reader.onerror=()=>reject(reader.error||new Error('Gagal membaca berkas.'));reader.readAsDataURL(file)})
 }
-async function saveSharedArchive(nm,dt){
+async function saveSharedArchive(nm,dt,selectedFiles,progress){
 const button=$('add').querySelector('.btn');if(button){button.disabled=true;button.textContent='Mengunggah ke Drive…'}
 try{
-const files=await Promise.all([...$('fo').files].map(fileAsBase64));
-const record=await rpc('saveArchive',AUTH_TOKEN,{kind,nm,dt,ds:$('ds').value.trim(),pr:kind==='Pembangunan'?+$('pr').value:null,files});
-DB.unshift(record);toast(files.length?'Arsip dan foto tersimpan di Drive bersama.':'Arsip tersimpan bersama.');go('dash')
+const files=await Promise.all(selectedFiles.map(fileAsBase64));
+const action=editingId?'updateArchive':'saveArchive';
+const record=await request(action,{record:{id:editingId,kind,nm,dt,ds:$('ds').value.trim(),pr:progress,files}});
+if(editingId){DB=DB.map(item=>item.id===record.id?record:item);editingId=null}
+else DB.unshift(record);
+toast(files.length?'Arsip dan berkas tersimpan di Drive bersama.':'Arsip tersimpan bersama.');go('dash')
 }catch(e){console.error('Gagal menyimpan arsip bersama.',e);toast(e.message||'Gagal menyimpan arsip.',1);if(button){button.disabled=false;button.innerHTML=ic('save')+'Simpan ke Drive &amp; Database'}}
 }
 
 /* 2. Cari & Lihat */
 function years(){const c=$('fy').value,ys=[...new Set(DB.map(x=>yr(x.dt)))].sort().reverse();
 $('fy').innerHTML='<option value="">Semua tahun</option>'+ys.map(y=>`<option ${y===c?'selected':''}>${y}</option>`).join('')}
-function rows(r){return r.length?r.map(x=>`<tr class="r" onclick="view(${x.id})"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${x.dt}</td>
-<td class="mu">${x.pr!=null?`<span class="bar"><i style="width:${x.pr}%"></i></span>${x.pr}%`:x.n+' foto'}</td></tr>`).join(''):'<tr><td colspan="4" class="mu">Tidak ada arsip yang cocok.</td></tr>'}
-function render(){const y=$('fy').value,k=$('fc').value;$('tb').innerHTML=rows(DB.filter(x=>(!y||yr(x.dt)===y)&&(!k||x.kind===k)))}
-function gsearch(){const q=$('gq').value.toLowerCase();go('find');$('tb').innerHTML=rows(DB.filter(x=>x.nm.toLowerCase().includes(q)))}
+function rows(r){return r.length?r.map(x=>`<tr class="r" onclick="view('${esc(x.id)}')"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${x.dt}</td>
+<td class="mu">${x.pr!=null?`<span class="bar"><i style="width:${x.pr}%"></i></span>${x.pr}%`:x.n+' berkas'}</td></tr>`).join(''):'<tr><td colspan="4" class="mu">Tidak ada arsip yang cocok.</td></tr>'}
+function render(){const y=$('fy').value,k=$('fc').value,q=$('gq').value.trim().toLowerCase();$('tb').innerHTML=rows(DB.filter(x=>(!y||yr(x.dt)===y)&&(!k||x.kind===k)&&x.nm.toLowerCase().includes(q)))}
+function gsearch(){go('find')}
 function view(id){const x=DB.find(a=>a.id===id);if(!x)return;
-$('mb').innerHTML=`<span class="pill">${lab(x.kind)}</span><h2 style="margin:.5rem 0;color:var(--pr)">${esc(x.nm)}</h2><p class="mu sm">${x.dt} · ${x.n} foto</p><p>${esc(x.ds||'Tanpa deskripsi.')}</p>
+$('mb').innerHTML=`<span class="pill">${lab(x.kind)}</span><h2 style="margin:.5rem 0;color:var(--pr)">${esc(x.nm)}</h2><p class="mu sm">${x.dt} · ${x.n} berkas</p><p>${esc(x.ds||'Tanpa deskripsi.')}</p>
 ${x.pr!=null?`<b>Progres ${x.pr}%</b><div style="height:8px;background:var(--bd);border-radius:8px;margin-top:.4rem;overflow:hidden"><i style="display:block;height:100%;width:${x.pr}%;background:var(--ok)"></i></div>`:''}
-${x.driveFiles&&x.driveFiles.length?`<div style="display:grid;gap:.5rem;margin-top:1rem">${x.driveFiles.map(f=>`<a href="${esc(f.webViewLink||'https://drive.google.com/file/d/'+encodeURIComponent(f.id)+'/view')}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join('')}</div>`:''}
-<div class="path">${esc(me.drive||'Drive belum terhubung')} › /${yr(x.dt)}/${x.kind}/</div>
-<div class="row"><button class="btn gh" onclick="closeM()">Tutup</button></div>`;
+${x.driveFiles&&x.driveFiles.length?`<div style="display:grid;gap:.8rem;margin-top:1rem">${x.driveFiles.map(f=>{const image=(f.mimeType||'').indexOf('image/')===0||/\.(jpe?g|png|gif|webp)$/i.test(f.name||'');const url='https://drive.google.com/uc?export=view&id='+encodeURIComponent(f.id);return `<div>${image?`<img src="${url}" alt="${esc(f.name)}" loading="lazy" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px;margin-bottom:.35rem" onerror="this.hidden=true">`:''}<a href="${esc(f.webViewLink||'https://drive.google.com/file/d/'+encodeURIComponent(f.id)+'/view')}" target="_blank" rel="noopener">${esc(f.name)}</a> · <a href="https://drive.google.com/uc?export=download&amp;id=${encodeURIComponent(f.id)}" target="_blank" rel="noopener">Unduh</a></div>`}).join('')}</div>`:''}
+<div class="path">Drive bersama sekolah › /${yr(x.dt)}/${lab(x.kind)}/</div>
+<div class="row">${me.isAdmin?`<button class="btn" onclick="editArchive('${esc(x.id)}')">Edit</button><button class="btn gh" onclick="removeArchive('${esc(x.id)}')">Hapus</button>`:''}<button class="btn gh" onclick="closeM()">Tutup</button></div>`;
 $('modal').classList.remove('hide')}
+function editArchive(id){
+const x=DB.find(item=>item.id===id);if(!x||!me.isAdmin)return;
+closeM();go('add');editingId=x.id;pick(x.kind);
+$('nm').value=x.nm;$('dt').value=x.dt;$('ds').value=x.ds||'';
+if(x.pr!=null){$('pr').value=x.pr;$('pv').textContent=x.pr}
+const saveButton=$('add').querySelector('.row .btn');
+if(saveButton)saveButton.innerHTML=ic('save')+'Simpan perubahan';
+}
+async function removeArchive(id){
+if(!me.isAdmin||!window.confirm('Hapus arsip ini beserta berkasnya dari Drive?'))return;
+try{
+await request('deleteArchive',{id:id});DB=DB.filter(item=>item.id!==id);closeM();dash();toast('Arsip dan berkas terkait berhasil dihapus.')
+}catch(e){toast(e.message||'Gagal menghapus arsip.',1)}
+}
 function closeM(){$('modal').classList.add('hide')}
+async function refreshArchives(silent){
+try{
+DB=await request('getArchives');
+if(!$('dash').classList.contains('hide'))dash();
+if(!$('find').classList.contains('hide')){years();render()}
+if(!silent)toast('Data arsip diperbarui.')
+}catch(e){if(!silent)toast(e.message||'Gagal memuat ulang arsip.',1);else console.error('Sinkronisasi arsip gagal.',e)}
+}
+setInterval(()=>{if(me&&document.visibilityState==='visible')refreshArchives(true)},60000);
 let tt;function toast(m,e){const t=$('toast');t.innerHTML=ic(e?'x':'check')+esc(m);t.style.background=e?'#dc2626':'';t.classList.remove('hide');clearTimeout(tt);tt=setTimeout(()=>t.classList.add('hide'),5000)}
 function rpc(method,...args){
-return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[method](...args))
+return new Promise((resolve,reject)=>{
+if(!window.google||!google.script||!google.script.run)return reject(new Error('Google Apps Script bridge tidak tersedia.'));
+google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[method](...args)
+})
 }
-async function initSharedApp(){
-$('auth').innerHTML='<div class="box"><div class="brand">Arsip Sekolah</div><p class="mu sm">Masuk dengan akun Google yang sudah diizinkan admin untuk membuka arsip bersama.</p><div id="googleSignIn"></div><p class="mu sm" id="sharedStatus">Memuat login Google…</p></div>';
-let attempts=0;
-const waitForGoogle=()=>{
-if(window.google&&google.accounts&&google.accounts.id){
-rpc('getClientConfig').then(config=>{
-google.accounts.id.initialize({client_id:config.clientId,callback:completeSharedSignIn,auto_select:false});
-google.accounts.id.renderButton($('googleSignIn'),{theme:'outline',size:'large',text:'signin_with',locale:'id'})
-}).catch(e=>{const status=$('sharedStatus');if(status)status.textContent=e.message||'Konfigurasi aplikasi belum siap.'});
+async function postApi(payload){
+if(!CONFIG.apiUrl)throw new Error('URL Web App Apps Script belum dipasang di window.ARSIP_CONFIG.');
+const nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
+const frame=document.createElement('iframe'),form=document.createElement('form');
+frame.name='arsip-api-'+nonce;frame.style.display='none';frame.setAttribute('aria-hidden','true');
+form.method='POST';form.action=CONFIG.apiUrl;form.target=frame.name;form.style.display='none';
+const field=document.createElement('input');field.type='hidden';field.name='request';
+field.value=JSON.stringify({...payload,bridge:{nonce,origin:location.origin}});
+form.appendChild(field);document.body.append(frame,form);
+return new Promise((resolve,reject)=>{
+let timer;
+const cleanup=()=>{clearTimeout(timer);window.removeEventListener('message',receive);form.remove();frame.remove()};
+const receive=event=>{
+if(event.source!==frame.contentWindow||!event.data||event.data.nonce!==nonce)return;
+cleanup();const result=event.data.response;
+if(!result||!result.ok)reject(new Error(result&&result.error||'Permintaan ke backend gagal.'));
+else resolve(result.result)
+};
+window.addEventListener('message',receive);
+timer=setTimeout(()=>{cleanup();reject(new Error('Backend tidak merespons. Periksa deployment dan ALLOWED_ORIGINS.'))},120000);
+form.submit()
+})
+}
+async function request(action,payload={}){
+if(SHARED_MODE){
+const args={
+getBootstrapData:[AUTH_TOKEN],getArchives:[AUTH_TOKEN],saveArchive:[AUTH_TOKEN,payload.record],
+getUserPermissions:[AUTH_TOKEN],
+updateArchive:[AUTH_TOKEN,payload.record],deleteArchive:[AUTH_TOKEN,payload.id],
+updateSharedSettings:[AUTH_TOKEN,payload.settings]
+}[action];
+if(!args)throw new Error('Aksi backend tidak dikenal.');
+return rpc(action,...args)
+}
+return postApi({action,idToken:AUTH_TOKEN,...payload})
+}
+function showSignedIn(data){
+DB=Array.isArray(data.archives)?data.archives:[];
+CONFIG.adminEmail=data.adminEmail;CONFIG.authorizedEmails=data.authorizedEmails||[];
+CONNECTION=data.connection||{spreadsheet:false,drive:false};
+me={email:data.email,isAdmin:!!data.isAdmin};
+$('who').textContent=me.email;$('av').textContent=me.email[0].toUpperCase();
+document.querySelector('[data-v="settings"]').classList.toggle('hide',!me.isAdmin);
+$('auth').classList.add('hide');$('app').classList.remove('hide');go('dash')
+}
+async function completeSignIn(response){
+AUTH_TOKEN=response.credential;
+const status=$('sharedStatus');if(status)status.textContent='Memeriksa akun dan mengambil data arsip…';
+try{showSignedIn(await request('getBootstrapData'))}
+catch(e){console.error('Gagal membuka aplikasi bersama.',e);if(status)status.textContent=e.message||'Akun belum diizinkan membuka arsip.'}
+}
+function initializeSignIn(){
+if(!CONFIG.googleClientId||(!SHARED_MODE&&!CONFIG.apiUrl)){
+$('sharedStatus').textContent='Konfigurasi belum lengkap: isi Google Client ID dan URL Web App pada window.ARSIP_CONFIG.';
 return
 }
-if(++attempts<40)return setTimeout(waitForGoogle,250);
-const status=$('sharedStatus');if(status)status.textContent='Layanan login Google tidak termuat. Periksa koneksi internet lalu muat ulang halaman.'
-};
-waitForGoogle()
+if(!window.google||!google.accounts||!google.accounts.id){$('sharedStatus').textContent='Layanan login Google belum termuat. Periksa koneksi lalu muat ulang.';return}
+google.accounts.id.initialize({client_id:CONFIG.googleClientId,callback:completeSignIn,auto_select:false});
+google.accounts.id.renderButton($('googleSignIn'),{theme:'outline',size:'large',text:'signin_with',locale:'id'})
 }
-async function completeSharedSignIn(response){
-AUTH_TOKEN=response.credential;
-const status=$('sharedStatus');if(status)status.textContent='Memeriksa akun sekolah…';
-try{
-const data=await rpc('getBootstrapData',AUTH_TOKEN);
-DB=data.archives;CONFIG.adminEmail=data.adminEmail;CONFIG.authorizedEmails=data.authorizedEmails;me={email:data.email,name:data.email,isAdmin:data.isAdmin,drive:'Drive bersama sekolah'};
-$('who').textContent=me.email;$('av').textContent=me.email[0].toUpperCase();$('auth').classList.add('hide');$('app').classList.remove('hide');go('dash')
-}catch(e){
-console.error('Gagal membuka aplikasi bersama.',e);
-const message=document.getElementById('sharedStatus');if(message)message.textContent=e.message||'Tidak dapat mengakses aplikasi. Pastikan akun Google Anda sudah diizinkan admin.';
-}
-}
-if(SHARED_MODE)initSharedApp();
+window.addEventListener('load',initializeSignIn);
 </script></body></html>
