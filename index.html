@@ -66,6 +66,8 @@ tr.r{cursor:pointer}tr.r:hover td{background:var(--sel)}
 .acc small{font-size:.65rem;letter-spacing:.1em;color:var(--mu);display:block}.acc b{font-size:.85rem;word-break:break-all}
 .acc.ok{border-color:var(--ok)}
 .path{font-family:ui-monospace,Menlo,monospace;background:#e3f5e7;color:#15632e;padding:.5rem .8rem;border-radius:10px;font-size:.8rem;margin-top:.8rem}
+.file-list{display:grid;gap:.65rem;margin-top:.7rem}.file-item{display:flex;align-items:center;gap:.5rem;min-width:0;overflow-wrap:anywhere}.file-item input{width:auto;flex:none}.file-item a{overflow-wrap:anywhere}
+.file-preview{display:grid;gap:.8rem;margin-top:1rem}.file-preview img{display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px;margin-bottom:.35rem}
 .row{display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap}
 #modal{position:fixed;inset:0;background:rgba(8,14,30,.6);display:grid;place-items:center;padding:1rem;z-index:15}
 #modal .card{background:var(--shell);width:100%;max-width:500px;max-height:90vh;overflow:auto}
@@ -131,7 +133,23 @@ tr.r td:first-child{flex-basis:100%;font-weight:600}
 
 <div id="modal" class="hide" onclick="if(event.target===this)closeM()"><div class="card" id="mb"></div></div>
 <div id="toast" class="hide"></div>
-<script>window.ARSIP_CONFIG=window.ARSIP_CONFIG||{googleClientId:'',apiUrl:''};</script>
+<script>
+// Isi dengan konfigurasi Google OAuth, Apps Script Web App, dan Firebase milik sekolah.
+window.ARSIP_CONFIG=Object.assign({
+  googleClientId:'1332668873-v5g51gf296c9ohs3mogiefci81i901c4.apps.googleusercontent.com',
+  apiUrl:'https://script.google.com/macros/s/AKfycbwIHtokTh3b4LLZdzp4bUwQnRhn-pywp65X-w15hFLzi-CIFLRpDGRu2orCOynLIBOs/exec',
+  firebaseConfig:{
+    apiKey:'AIzaSyDA7uwAoKZ-n7m1XfQUz7LIIC_EeZAKNp0',
+    authDomain:'arsip-sekolah-7f36d.firebaseapp.com',
+    databaseURL:'https://arsip-sekolah-7f36d-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId:'arsip-sekolah-7f36d',
+    appId:'1:1332668873:web:4bf74d494211fd6f142018'
+  }
+},window.ARSIP_CONFIG||{});
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -141,24 +159,29 @@ const P={cloud:'<path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
 document.querySelectorAll('[data-i]').forEach(e=>{e.innerHTML=ic(e.dataset.i)});
 const CONFIG=window.ARSIP_CONFIG||{googleClientId:'',apiUrl:''};
-let DB=[],kind='',me=null,editingId=null;
-let CONNECTION={spreadsheet:false,drive:false};
+let DB=[],kind='',me=null,editingId=null,fbAuth=null,fbDb=null;
+let CONNECTION={firebase:false,drive:false};
 const yr=d=>d.slice(0,4),lab=k=>k==='Pembangunan'?'Pembangunan':'Kegiatan Sekolah',okMail=s=>/^\S+@\S+\.\S+$/.test(s);
 const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
-const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fileList=x=>Array.isArray(x&&x.driveFiles)?x.driveFiles:[];
+const fileCount=x=>Array.isArray(x&&x.driveFiles)?x.driveFiles.length:Math.max(0,Number(x&&x.n)||0);
+const driveFileUrl=(f,download)=>f&&f.id?'https://drive.google.com/uc?export='+(download?'download':'view')+'&id='+encodeURIComponent(f.id):'#';
 
-function logout(){AUTH_TOKEN='';me=null;DB=[];if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();location.reload()}
+function logout(){AUTH_TOKEN='';me=null;DB=[];if(fbAuth)fbAuth.signOut().catch(e=>console.error('Gagal mengakhiri sesi Firebase.',e));if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();location.reload()}
 
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
-function go(v,f){['dash','add','find','settings'].forEach(x=>$(x).classList.toggle('hide',x!==v));
+function showPage(v){['dash','add','find','settings'].forEach(x=>$(x).classList.toggle('hide',x!==v));
 document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+}
+function go(v,f){showPage(v);
 if(v==='dash')dash();if(v==='add')addView();if(v==='settings')settingsView();if(v==='find'){years();if(f){$('fy').value=f.y||'';$('fc').value=f.k||''}render()}
 const n=DB.reduce((a,x)=>a+(Number(x.n)||0),0);$('sb').style.width=Math.min(95,10+n)+'%';
 $('sde').textContent=CONNECTION.drive?'Drive sekolah terhubung':'Drive belum terhubung';$('st').textContent=n+' berkas tersimpan';window.scrollTo(0,0)}
 
 /* Status dan izin disediakan backend, bukan dipercaya dari browser. */
 function accounts(){return `<div class="two"><div class="acc"><small>AKUN LOGIN</small><b>${ic('user')} ${esc(me.email)}</b></div>
-<div class="acc ${CONNECTION.drive&&CONNECTION.spreadsheet?'ok':''}"><small>DATABASE &amp; DRIVE</small><b>${ic('cloud')} ${CONNECTION.spreadsheet&&CONNECTION.drive?'Terhubung':'Periksa koneksi backend'}</b></div></div>`}
+<div class="acc ${CONNECTION.drive&&CONNECTION.firebase?'ok':''}"><small>FIREBASE &amp; DRIVE</small><b>${ic('cloud')} ${CONNECTION.firebase&&CONNECTION.drive?'Terhubung':'Periksa koneksi backend'}</b></div></div>`}
 function settingsView(){
 const canEdit=me.isAdmin;
  $('settings').innerHTML=`<h1>Pengaturan</h1><div class="rule"></div>${accounts()}
@@ -198,77 +221,129 @@ $('dash').innerHTML=`<h1>Halaman Utama <button class="btn gh" style="float:right
 <h4>Quick Access</h4><div class="qa">${fo.slice(0,4).map(([y,k,c])=>`<div class="fold" onclick="go('find',{y:'${y}',k:'${k}'})"><small>FOLDER</small><b>${ic('folder')}/${y}/${lab(k)}/</b><span>${c} arsip</span></div>`).join('')}</div>
 <h4>Arsip Terbaru</h4><div class="tw"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Tanggal</th></tr></thead><tbody>${DB.slice(0,4).map(x=>`<tr class="r" onclick="view('${esc(x.id)}')"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${x.dt}</td></tr>`).join('')||'<tr><td class="mu">Belum ada arsip.</td></tr>'}</tbody></table></div>`}
 
-/* 1. Tambah Arsip: pilih kategori, isi metadata, lalu kirim ke backend. */
+/* Metadata arsip disimpan ke Firebase; berkasnya dikirim ke Apps Script untuk Google Drive. */
 const hd=(a,b,c)=>`<h1>Tambah Arsip Baru</h1><div class="rule"></div><div class="steps"><span class="${a}">1 Jenis</span><span class="${b}">2 Detail</span><span class="${c}">3 Simpan</span></div>`;
 function addView(){kind='';editingId=null;
 $('add').innerHTML=hd('on','','')+accounts()+`<div class="card"><b>Pilih jenis kegiatan</b><div class="seg">
 <button onclick="pick('Pembangunan')"><b>${ic('build')}Pembangunan</b><span class="mu sm">Proyek &amp; progres 0–100%</span></button>
 <button onclick="pick('Kegiatan_Sekolah')"><b>${ic('cap')}Kegiatan Sekolah</b><span class="mu sm">Acara &amp; dokumentasi</span></button></div></div>`}
-function pick(k){kind=k;const p=k==='Pembangunan';
+function pick(k,record){kind=k;const p=k==='Pembangunan',files=fileList(record);
 $('add').innerHTML=hd('','on','')+`<div class="card"><b>${p?'Detail Proyek & Foto Progres (0%–100%)':'Detail Acara & Foto Dokumentasi'}</b>
-<label>${p?'Nama proyek':'Nama acara'}</label><input id="nm"><label>Tanggal</label><input id="dt" type="date" value="${today()}" onchange="updPath()">
-<label>Deskripsi</label><textarea id="ds" rows="2"></textarea>
-${p?`<label>Progres: <span id="pv">0</span>%</label><input type="range" id="pr" min="0" max="100" step="1" value="0" oninput="pv.textContent=this.value">`:''}
+<label>${p?'Nama proyek':'Nama acara'}</label><input id="nm" value="${esc(record&&record.nm)}"><label>Tanggal</label><input id="dt" type="date" value="${esc(record&&record.dt||today())}" onchange="updPath()">
+<label>Deskripsi</label><textarea id="ds" rows="2">${esc(record&&record.ds||'')}</textarea>
+${p?`<label>Progres: <span id="pv">${record&&record.pr!=null?Number(record.pr):0}</span>%</label><input type="range" id="pr" min="0" max="100" step="1" value="${record&&record.pr!=null?Number(record.pr):0}" oninput="$('pv').textContent=this.value">`:''}
+${record?`<label>Berkas lama</label><p class="mu sm">Berkas yang tidak dipilih akan tetap tersimpan. Tandai berkas untuk dihapus atau diganti, lalu pilih berkas baru di bawah.</p>
+<div class="file-list">${files.map(f=>`<label class="file-item"><input type="checkbox" class="remove-old-file" value="${esc(f.id)}"><span>${esc(f.name||'Berkas tanpa nama')}</span></label>`).join('')||'<span class="mu sm">Belum ada berkas lama.</span>'}</div>`:''}
 <label>Foto atau dokumen</label><input type="file" id="fo" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" multiple>
 <div class="path" id="path"></div>
-<div class="row"><button class="btn" onclick="save()">${ic('save')}Simpan ke Drive &amp; Database</button><button class="btn gh" onclick="addView()">${ic('back')}Kembali</button></div></div>`;updPath()}
+<div class="row"><button class="btn" onclick="save()">${ic('save')}${record?'Simpan perubahan':'Simpan ke Drive &amp; Firebase'}</button><button class="btn gh" onclick="addView()">${ic('back')}Kembali</button></div></div>`;updPath()}
 function updPath(){$('path').textContent='Drive bersama sekolah › /'+($('dt').value||'Tahun').slice(0,4)+'/'+(kind==='Kegiatan_Sekolah'?'Kegiatan Sekolah':'Pembangunan')+'/'}
 async function save(){
 const nm=$('nm').value.trim(),dt=$('dt').value;if(!nm||!dt)return toast('Nama & tanggal wajib diisi',1);
+const parsedDate=new Date(dt+'T00:00:00Z');
+if(nm.length>200||$('ds').value.trim().length>5000)return toast('Nama maksimal 200 karakter dan deskripsi maksimal 5.000 karakter.',1);
+if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)||isNaN(parsedDate.getTime())||parsedDate.toISOString().slice(0,10)!==dt)return toast('Tanggal tidak valid.',1);
 const progress=kind==='Pembangunan'?Number($('pr').value):null;
 if(kind==='Pembangunan'&&(!Number.isInteger(progress)||progress<0||progress>100))return toast('Progres harus 0–100%.',1);
 const files=[...$('fo').files];
 if(files.length>10||files.reduce((n,f)=>n+f.size,0)>10*1024*1024)return toast('Maksimal 10 berkas dan total ukuran 10 MB.',1);
 if(files.some(f=>!['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(f.type)))return toast('Tipe berkas tidak diizinkan.',1);
-await saveSharedArchive(nm,dt,files,progress)
+const oldRecord=editingId&&DB.find(item=>item.id===editingId),removeIds=[...document.querySelectorAll('.remove-old-file:checked')].map(input=>input.value);
+if(editingId&&!oldRecord)return toast('Arsip yang akan diedit tidak ditemukan. Muat ulang data lalu coba lagi.',1);
+const retained=oldRecord?fileList(oldRecord).filter(file=>!removeIds.includes(String(file.id))):[];
+if(retained.length+files.length>10)return toast('Maksimal 10 berkas per arsip. Hapus berkas lama sebelum menambah berkas baru.',1);
+await saveSharedArchive(nm,dt,files,progress,retained,removeIds)
 }
 async function fileAsBase64(file){
 return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type,data:String(reader.result).split(',')[1]||''});reader.onerror=()=>reject(reader.error||new Error('Gagal membaca berkas.'));reader.readAsDataURL(file)})
 }
-async function saveSharedArchive(nm,dt,selectedFiles,progress){
+async function saveSharedArchive(nm,dt,selectedFiles,progress,retainedFiles,removedFileIds){
 const button=$('add').querySelector('.btn');if(button){button.disabled=true;button.textContent='Mengunggah ke Drive…'}
+let uploadedFiles=[];
+let cleanupToken='';
 try{
 const files=await Promise.all(selectedFiles.map(fileAsBase64));
-const action=editingId?'updateArchive':'saveArchive';
-const record=await request(action,{record:{id:editingId,kind,nm,dt,ds:$('ds').value.trim(),pr:progress,files}});
-if(editingId){DB=DB.map(item=>item.id===record.id?record:item);editingId=null}
-else DB.unshift(record);
-toast(files.length?'Arsip dan berkas tersimpan di Drive bersama.':'Arsip tersimpan bersama.');go('dash')
-}catch(e){console.error('Gagal menyimpan arsip bersama.',e);toast(e.message||'Gagal menyimpan arsip.',1);if(button){button.disabled=false;button.innerHTML=ic('save')+'Simpan ke Drive &amp; Database'}}
+if(files.length){const uploadResult=await request('uploadArchiveFiles',{files,dt,kind});uploadedFiles=uploadResult.driveFiles||[];cleanupToken=uploadResult.cleanupToken||''}
+const id=editingId||fbDb.ref(kind).push().key;
+const record={id,kind,nm,dt,ds:$('ds').value.trim(),pr:kind==='Pembangunan'?progress:null,
+driveFiles:retainedFiles.concat(uploadedFiles),n:retainedFiles.length+uploadedFiles.length,uploader:me.email};
+await archiveRef(kind,id).set(record);
+DB=DB.filter(item=>item.id!==id);DB.unshift(record);editingId=null;
+let cleanupMessage='';
+if(removedFileIds.length){try{await request('deleteDriveFiles',{fileIds:removedFileIds})}
+catch(e){console.error('Metadata tersimpan, tetapi berkas Drive lama gagal dihapus.',e);cleanupMessage=' Metadata tersimpan, tetapi sebagian berkas lama gagal dihapus dari Drive: '+(e.message||'periksa izin Drive')}}
+toast((files.length?'Arsip dan berkas tersimpan di Drive dan Firebase.':'Metadata arsip tersimpan di Firebase.')+cleanupMessage,!!cleanupMessage);go('dash')
+}catch(e){
+let cleanupMessage='';
+if(uploadedFiles.length){try{await request('deleteDriveFiles',{fileIds:uploadedFiles.map(file=>file.id),cleanupToken})}
+catch(cleanupError){console.error('Gagal membersihkan unggahan setelah penyimpanan metadata gagal.',cleanupError);cleanupMessage=' Berkas baru mungkin masih tersimpan di Drive.'}}
+console.error('Gagal menyimpan arsip bersama.',e);toast((e.message||'Gagal menyimpan arsip.')+cleanupMessage,1);
+if(button){button.disabled=false;button.innerHTML=ic('save')+(editingId?'Simpan perubahan':'Simpan ke Drive &amp; Firebase')}
+}
 }
 
 /* 2. Cari & Lihat */
 function years(){const c=$('fy').value,ys=[...new Set(DB.map(x=>yr(x.dt)))].sort().reverse();
 $('fy').innerHTML='<option value="">Semua tahun</option>'+ys.map(y=>`<option ${y===c?'selected':''}>${y}</option>`).join('')}
-function rows(r){return r.length?r.map(x=>`<tr class="r" onclick="view('${esc(x.id)}')"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${x.dt}</td>
-<td class="mu">${x.pr!=null?`<span class="bar"><i style="width:${x.pr}%"></i></span>${x.pr}%`:x.n+' berkas'}</td></tr>`).join(''):'<tr><td colspan="4" class="mu">Tidak ada arsip yang cocok.</td></tr>'}
+function rows(r){return r.length?r.map(x=>`<tr class="r" onclick="view('${esc(x.id)}')"><td>${ico(x)}${esc(x.nm)}</td><td><span class="pill">${lab(x.kind)}</span></td><td class="mu">${esc(x.dt)}</td>
+<td class="mu">${x.pr!=null?`<span class="bar"><i style="width:${Math.max(0,Math.min(100,Number(x.pr)||0))}%"></i></span>${Number(x.pr)||0}%`:fileCount(x)+' berkas'}</td></tr>`).join(''):'<tr><td colspan="4" class="mu">Tidak ada arsip yang cocok.</td></tr>'}
 function render(){const y=$('fy').value,k=$('fc').value,q=$('gq').value.trim().toLowerCase();$('tb').innerHTML=rows(DB.filter(x=>(!y||yr(x.dt)===y)&&(!k||x.kind===k)&&x.nm.toLowerCase().includes(q)))}
-function gsearch(){go('find')}
+function gsearch(){if($('find').classList.contains('hide'))go('find');else render()}
 function view(id){const x=DB.find(a=>a.id===id);if(!x)return;
-$('mb').innerHTML=`<span class="pill">${lab(x.kind)}</span><h2 style="margin:.5rem 0;color:var(--pr)">${esc(x.nm)}</h2><p class="mu sm">${x.dt} · ${x.n} berkas</p><p>${esc(x.ds||'Tanpa deskripsi.')}</p>
-${x.pr!=null?`<b>Progres ${x.pr}%</b><div style="height:8px;background:var(--bd);border-radius:8px;margin-top:.4rem;overflow:hidden"><i style="display:block;height:100%;width:${x.pr}%;background:var(--ok)"></i></div>`:''}
-${x.driveFiles&&x.driveFiles.length?`<div style="display:grid;gap:.8rem;margin-top:1rem">${x.driveFiles.map(f=>{const image=(f.mimeType||'').indexOf('image/')===0||/\.(jpe?g|png|gif|webp)$/i.test(f.name||'');const url='https://drive.google.com/uc?export=view&id='+encodeURIComponent(f.id);return `<div>${image?`<img src="${url}" alt="${esc(f.name)}" loading="lazy" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px;margin-bottom:.35rem" onerror="this.hidden=true">`:''}<a href="${esc(f.webViewLink||'https://drive.google.com/file/d/'+encodeURIComponent(f.id)+'/view')}" target="_blank" rel="noopener">${esc(f.name)}</a> · <a href="https://drive.google.com/uc?export=download&amp;id=${encodeURIComponent(f.id)}" target="_blank" rel="noopener">Unduh</a></div>`}).join('')}</div>`:''}
+const files=fileList(x);
+$('mb').innerHTML=`<span class="pill">${lab(x.kind)}</span><h2 style="margin:.5rem 0;color:var(--pr)">${esc(x.nm)}</h2><p class="mu sm">${esc(x.dt)} · ${fileCount(x)} berkas</p><p>${esc(x.ds||'Tanpa deskripsi.')}</p>
+${x.pr!=null?`<b>Progres ${Math.max(0,Math.min(100,Number(x.pr)||0))}%</b><div style="height:8px;background:var(--bd);border-radius:8px;margin-top:.4rem;overflow:hidden"><i style="display:block;height:100%;width:${Math.max(0,Math.min(100,Number(x.pr)||0))}%;background:var(--ok)"></i></div>`:''}
+${files.length?`<div class="file-preview">${files.map(f=>{const image=(f.mimeType||'').indexOf('image/')===0||/\.(jpe?g|png|gif|webp)$/i.test(f.name||'');const url=driveFileUrl(f,false);return `<div>${image&&f.id?`<img src="${url}" alt="${esc(f.name)}" loading="lazy" onerror="this.hidden=true">`:''}<a href="${url}" target="_blank" rel="noopener">${esc(f.name||'Buka berkas')}</a> · <a href="${driveFileUrl(f,true)}" target="_blank" rel="noopener">Unduh</a></div>`}).join('')}</div>`:''}
 <div class="path">Drive bersama sekolah › /${yr(x.dt)}/${lab(x.kind)}/</div>
 <div class="row">${me.isAdmin?`<button class="btn" onclick="editArchive('${esc(x.id)}')">Edit</button><button class="btn gh" onclick="removeArchive('${esc(x.id)}')">Hapus</button>`:''}<button class="btn gh" onclick="closeM()">Tutup</button></div>`;
 $('modal').classList.remove('hide')}
 function editArchive(id){
 const x=DB.find(item=>item.id===id);if(!x||!me.isAdmin)return;
-closeM();go('add');editingId=x.id;pick(x.kind);
-$('nm').value=x.nm;$('dt').value=x.dt;$('ds').value=x.ds||'';
-if(x.pr!=null){$('pr').value=x.pr;$('pv').textContent=x.pr}
-const saveButton=$('add').querySelector('.row .btn');
-if(saveButton)saveButton.innerHTML=ic('save')+'Simpan perubahan';
+closeM();kind=x.kind;editingId=x.id;showPage('add');pick(x.kind,x);
+window.scrollTo(0,0)
 }
 async function removeArchive(id){
 if(!me.isAdmin||!window.confirm('Hapus arsip ini beserta berkasnya dari Drive?'))return;
 try{
-await request('deleteArchive',{id:id});DB=DB.filter(item=>item.id!==id);closeM();dash();toast('Arsip dan berkas terkait berhasil dihapus.')
+const record=DB.find(item=>item.id===id);if(!record)throw new Error('Arsip tidak ditemukan.');
+await archiveRef(record.kind,id).remove();DB=DB.filter(item=>item.id!==id);closeM();dash();
+if(fileList(record).length){try{await request('deleteDriveFiles',{fileIds:fileList(record).map(file=>file.id)})}
+catch(e){console.error('Metadata telah dihapus dari Firebase, tetapi berkas Drive gagal dihapus.',e);toast('Metadata dihapus, tetapi berkas Drive gagal dibersihkan: '+(e.message||'periksa izin Drive'),1);return}}
+toast('Arsip dihapus dari Firebase dan berkas terkait di Drive.')
 }catch(e){toast(e.message||'Gagal menghapus arsip.',1)}
 }
 function closeM(){$('modal').classList.add('hide')}
+function archiveRef(category,id){
+if(!fbDb||!['Pembangunan','Kegiatan_Sekolah'].includes(category))throw new Error('Firebase Realtime Database belum siap atau kategori tidak valid.');
+return fbDb.ref(category+'/'+id)
+}
+function normalizeArchive(id,category,raw){
+const files=Array.isArray(raw&&raw.driveFiles)?raw.driveFiles:
+raw&&raw.driveFiles&&typeof raw.driveFiles==='object'?Object.keys(raw.driveFiles).map(key=>raw.driveFiles[key]):[];
+return {id:String(id),kind:category,nm:String(raw&&raw.nm||''),dt:String(raw&&raw.dt||''),
+ds:String(raw&&raw.ds||''),pr:category==='Pembangunan'&&raw&&raw.pr!=null?Number(raw.pr):null,
+driveFiles:files.filter(file=>file&&file.id),n:files.filter(file=>file&&file.id).length,
+uploader:String(raw&&raw.uploader||'')};
+}
+async function loadFirebaseArchives(){
+const results=await Promise.all(['Pembangunan','Kegiatan_Sekolah'].map(async category=>{
+const snapshot=await fbDb.ref(category).once('value'),value=snapshot.val()||{};
+return Object.keys(value).map(id=>normalizeArchive(id,category,value[id]));
+}));
+return results[0].concat(results[1]).sort((a,b)=>b.dt.localeCompare(a.dt));
+}
+async function migrateLegacyArchives(legacy){
+if(!Array.isArray(legacy)||!legacy.length)return loadFirebaseArchives();
+for(const item of legacy){
+if(!item||!item.id||!['Pembangunan','Kegiatan_Sekolah'].includes(item.kind))continue;
+const record=normalizeArchive(item.id,item.kind,item);
+await archiveRef(item.kind,item.id).transaction(value=>value===null?record:undefined);
+}
+return loadFirebaseArchives();
+}
 async function refreshArchives(silent){
 try{
-DB=await request('getArchives');
+DB=await loadFirebaseArchives();
 if(!$('dash').classList.contains('hide'))dash();
 if(!$('find').classList.contains('hide')){years();render()}
 if(!silent)toast('Data arsip diperbarui.')
@@ -308,9 +383,10 @@ form.submit()
 async function request(action,payload={}){
 if(SHARED_MODE){
 const args={
-getBootstrapData:[AUTH_TOKEN],getArchives:[AUTH_TOKEN],saveArchive:[AUTH_TOKEN,payload.record],
+getBootstrapData:[AUTH_TOKEN],getArchives:[AUTH_TOKEN],
+uploadArchiveFiles:[AUTH_TOKEN,payload.files,payload.dt,payload.kind],
+deleteDriveFiles:[AUTH_TOKEN,payload.fileIds].concat(payload.cleanupToken?[payload.cleanupToken]:[]),
 getUserPermissions:[AUTH_TOKEN],
-updateArchive:[AUTH_TOKEN,payload.record],deleteArchive:[AUTH_TOKEN,payload.id],
 updateSharedSettings:[AUTH_TOKEN,payload.settings]
 }[action];
 if(!args)throw new Error('Aksi backend tidak dikenal.');
@@ -321,7 +397,7 @@ return postApi({action,idToken:AUTH_TOKEN,...payload})
 function showSignedIn(data){
 DB=Array.isArray(data.archives)?data.archives:[];
 CONFIG.adminEmail=data.adminEmail;CONFIG.authorizedEmails=data.authorizedEmails||[];
-CONNECTION=data.connection||{spreadsheet:false,drive:false};
+CONNECTION={firebase:true,drive:!!(data.connection&&data.connection.drive)};
 me={email:data.email,isAdmin:!!data.isAdmin};
 $('who').textContent=me.email;$('av').textContent=me.email[0].toUpperCase();
 document.querySelector('[data-v="settings"]').classList.toggle('hide',!me.isAdmin);
@@ -330,14 +406,28 @@ $('auth').classList.add('hide');$('app').classList.remove('hide');go('dash')
 async function completeSignIn(response){
 AUTH_TOKEN=response.credential;
 const status=$('sharedStatus');if(status)status.textContent='Memeriksa akun dan mengambil data arsip…';
-try{showSignedIn(await request('getBootstrapData'))}
+try{
+const bootstrap=await request('getBootstrapData');
+const credential=firebase.auth.GoogleAuthProvider.credential(response.credential);
+const signedIn=await fbAuth.signInWithCredential(credential);
+if(String(signedIn.user.email||'').toLowerCase()!==String(bootstrap.email||'').toLowerCase())throw new Error('Akun Firebase tidak cocok dengan akun Google yang diizinkan.');
+bootstrap.archives=await migrateLegacyArchives(bootstrap.archives||[]);
+bootstrap.connection=Object.assign({},bootstrap.connection,{drive:!!(bootstrap.connection&&bootstrap.connection.drive)});
+showSignedIn(bootstrap);
+} 
 catch(e){console.error('Gagal membuka aplikasi bersama.',e);if(status)status.textContent=e.message||'Akun belum diizinkan membuka arsip.'}
 }
 function initializeSignIn(){
-if(!CONFIG.googleClientId||(!SHARED_MODE&&!CONFIG.apiUrl)){
-$('sharedStatus').textContent='Konfigurasi belum lengkap: isi Google Client ID dan URL Web App pada window.ARSIP_CONFIG.';
+const fc=CONFIG.firebaseConfig||{},firebaseReady=['apiKey','authDomain','databaseURL','projectId','appId'].every(key=>fc[key]&&!String(fc[key]).includes('YOUR_'));
+if(!CONFIG.googleClientId||String(CONFIG.googleClientId).includes('YOUR_')||(!SHARED_MODE&&(!CONFIG.apiUrl||String(CONFIG.apiUrl).includes('YOUR_')))||!firebaseReady){
+$('sharedStatus').textContent='Konfigurasi belum lengkap: isi Google Client ID, URL Web App, dan Firebase config pada window.ARSIP_CONFIG.';
 return
 }
+if(!window.firebase){$('sharedStatus').textContent='Firebase SDK belum termuat. Periksa koneksi lalu muat ulang.';return}
+try{
+if(!firebase.apps.length)firebase.initializeApp(fc);
+fbAuth=firebase.auth();fbDb=firebase.database();
+}catch(e){console.error('Gagal menginisialisasi Firebase.',e);$('sharedStatus').textContent='Inisialisasi Firebase gagal: '+(e.message||'periksa konfigurasi.');return}
 if(!window.google||!google.accounts||!google.accounts.id){$('sharedStatus').textContent='Layanan login Google belum termuat. Periksa koneksi lalu muat ulang.';return}
 google.accounts.id.initialize({client_id:CONFIG.googleClientId,callback:completeSignIn,auto_select:false});
 google.accounts.id.renderButton($('googleSignIn'),{theme:'outline',size:'large',text:'signin_with',locale:'id'})
