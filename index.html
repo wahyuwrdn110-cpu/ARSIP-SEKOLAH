@@ -106,8 +106,13 @@ tr.r td:first-child{flex-basis:100%;font-weight:600}
 
 <section id="auth"><div class="box">
 <div class="brand"><div class="lg"><span data-i="cloud"></span></div>Arsip Sekolah</div>
-<p class="mu sm" style="margin:1.2rem 0 .2rem">Masuk menggunakan akun Google yang telah diizinkan admin.</p>
-<div id="googleSignIn"></div><p class="mu sm" id="sharedStatus" role="status"></p>
+<p class="mu sm" style="margin:1.2rem 0 .2rem">Masuk dengan akun bersama sekolah.</p>
+<form onsubmit="login();return false">
+<label for="loginUsername">Username</label><input id="loginUsername" autocomplete="username" placeholder="Username">
+<label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password">
+<div class="row"><button id="loginButton" type="submit" class="btn">Masuk</button></div>
+</form>
+<p class="mu sm" id="sharedStatus" role="status"></p>
 </div></section>
 
 <div id="app" class="shell hide">
@@ -134,9 +139,8 @@ tr.r td:first-child{flex-basis:100%;font-weight:600}
 <div id="modal" class="hide" onclick="if(event.target===this)closeM()"><div class="card" id="mb"></div></div>
 <div id="toast" class="hide"></div>
 <script>
-// Isi dengan konfigurasi Google OAuth, Apps Script Web App, dan Firebase milik sekolah.
+// Isi dengan URL Apps Script Web App dan Firebase milik sekolah.
 window.ARSIP_CONFIG=Object.assign({
-  googleClientId:'1332668873-v5g51gf296c9ohs3mogiefci81i901c4.apps.googleusercontent.com',
   apiUrl:'https://script.google.com/macros/s/AKfycbwqzCkNperQhNGt97zmGQxXvM33W1-e_4HGkp2ulVTaZ9MOpwZ-fxEvvFmYQLFmfFRl/exec',
   firebaseConfig:{
     apiKey:'AIzaSyDA7uwAoKZ-n7m1XfQUz7LIIC_EeZAKNp0',
@@ -150,7 +154,6 @@ window.ARSIP_CONFIG=Object.assign({
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 const $=id=>document.getElementById(id);
 const SHARED_MODE=location.hostname==='script.google.com'||location.hostname==='script.googleusercontent.com'||(typeof google!=='undefined'&&!!google.script&&!!google.script.run);
@@ -158,8 +161,8 @@ let AUTH_TOKEN='';
 const P={cloud:'<path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18z"/>',plus:'<path d="M12 5v14M5 12h14"/>',home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',upload:'<path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',logout:'<path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',build:'<path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3"/>',cap:'<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',dl:'<path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/>',check:'<path d="m5 12 5 5 9-10"/>',save:'<path d="M5 3h11l3 3v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/>',back:'<path d="m12 19-7-7 7-7M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>'};
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
 document.querySelectorAll('[data-i]').forEach(e=>{e.innerHTML=ic(e.dataset.i)});
-const CONFIG=window.ARSIP_CONFIG||{googleClientId:'',apiUrl:''};
-let DB=[],kind='',me=null,editingId=null,fbAuth=null,fbDb=null;
+const CONFIG=window.ARSIP_CONFIG||{apiUrl:''};
+let DB=[],kind='',me=null,editingId=null,fbAuth=null,fbDb=null,LOGIN_CONFIG=null;
 let CONNECTION={firebase:false,drive:false};
 const yr=d=>d.slice(0,4),lab=k=>k==='Pembangunan'?'Pembangunan':'Kegiatan Sekolah',okMail=s=>/^\S+@\S+\.\S+$/.test(s);
 const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
@@ -168,7 +171,7 @@ const fileList=x=>Array.isArray(x&&x.driveFiles)?x.driveFiles:[];
 const fileCount=x=>Array.isArray(x&&x.driveFiles)?x.driveFiles.length:Math.max(0,Number(x&&x.n)||0);
 const driveFileUrl=(f,download)=>f&&f.id?'https://drive.google.com/uc?export='+(download?'download':'view')+'&id='+encodeURIComponent(f.id):'#';
 
-function logout(){AUTH_TOKEN='';me=null;DB=[];if(fbAuth)fbAuth.signOut().catch(e=>console.error('Gagal mengakhiri sesi Firebase.',e));if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();location.reload()}
+function logout(){AUTH_TOKEN='';me=null;DB=[];if(fbAuth)fbAuth.signOut().then(()=>location.reload()).catch(e=>{console.error('Gagal mengakhiri sesi Firebase.',e);toast('Gagal mengakhiri sesi. Muat ulang halaman.',1)});else location.reload()}
 
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
 function showPage(v){['dash','add','find','settings'].forEach(x=>$(x).classList.toggle('hide',x!==v));
@@ -180,33 +183,52 @@ const n=DB.reduce((a,x)=>a+(Number(x.n)||0),0);$('sb').style.width=Math.min(95,1
 $('sde').textContent=CONNECTION.drive?'Drive sekolah terhubung':'Drive belum terhubung';$('st').textContent=n+' berkas tersimpan';window.scrollTo(0,0)}
 
 /* Status dan izin disediakan backend, bukan dipercaya dari browser. */
-function accounts(){return `<div class="two"><div class="acc"><small>AKUN LOGIN</small><b>${ic('user')} ${esc(me.email)}</b></div>
+function accounts(){return `<div class="two"><div class="acc"><small>AKUN LOGIN</small><b>${ic('user')} ${esc(me.username)}</b></div>
 <div class="acc ${CONNECTION.drive&&CONNECTION.firebase?'ok':''}"><small>FIREBASE &amp; DRIVE</small><b>${ic('cloud')} ${CONNECTION.firebase&&CONNECTION.drive?'Terhubung':'Periksa koneksi backend'}</b></div></div>`}
 function settingsView(){
 const canEdit=me.isAdmin;
  $('settings').innerHTML=`<h1>Pengaturan</h1><div class="rule"></div>${accounts()}
-<div class="card"><b>Penyimpanan bersama sekolah</b><p class="mu sm">Daftar arsip tersimpan bersama. Guru yang emailnya disetujui admin dapat menambah arsip dan mengunduh berkas Drive.</p>
-<p class="mu sm">Akun Anda: ${esc(me.email)}</p>
-${canEdit?`<div class="rule" style="margin-top:1.2rem"></div><b>Email administrator aplikasi</b><label for="adminEmail">Email admin</label><input id="adminEmail" type="email" value="${esc(CONFIG.adminEmail)}" placeholder="admin@gmail.com">
-<label for="authorizedEmails">Email guru yang diizinkan (pisahkan dengan baris baru atau koma)</label><textarea id="authorizedEmails" rows="5" placeholder="guru1@gmail.com&#10;guru2@gmail.com">${esc((CONFIG.authorizedEmails||[]).filter(email=>email!==CONFIG.adminEmail).join('\n'))}</textarea>
-<p class="mu sm">Admin selalu diizinkan. Perubahan izin diperiksa kembali oleh backend pada setiap permintaan.</p>
-<div class="row"><button class="btn" onclick="saveSettings()">${ic('save')}Simpan admin &amp; akses guru</button></div>`:'<p class="mu sm">Pengaturan administrator hanya dapat diubah admin aplikasi.</p>'}
-</div><p class="mu sm">Gunakan akun Google yang disetujui admin. Keluar lalu masuk lagi untuk berganti akun.</p>`;
+<div class="card"><b>Akun bersama sekolah</b><p class="mu sm">Semua pengguna akun bersama memiliki hak admin dan tercatat dengan username yang sama. Siapa pun yang mengetahui password dapat menggantinya.</p>
+${canEdit?`<div class="rule" style="margin-top:1.2rem"></div><b>Username bersama</b><label for="sharedUsername">Username (3–32 karakter)</label><input id="sharedUsername" autocomplete="username" value="${esc(CONFIG.loginUsername||me.username)}">
+<div class="row"><button class="btn" onclick="saveSharedSettings()">${ic('save')}Simpan username</button></div>
+<div class="rule" style="margin-top:1.2rem"></div><b>Ubah password bersama</b><label for="currentPassword">Password saat ini</label><input id="currentPassword" type="password" autocomplete="current-password">
+<label for="newPassword">Password baru (minimal 8 karakter)</label><input id="newPassword" type="password" autocomplete="new-password">
+<div class="row"><button class="btn" onclick="changeSharedPassword()">${ic('save')}Ubah password</button></div>
+<div class="rule" style="margin-top:1.2rem"></div><b>Akses lampiran Google Drive</b><p class="mu sm">Masukkan email Google setiap pengguna yang perlu membuka lampiran. Mereka tetap harus login ke Google saat membuka berkas.</p>
+<label for="authorizedEmails">Email Google yang boleh membuka Drive (pisahkan dengan baris baru atau koma)</label><textarea id="authorizedEmails" rows="5" placeholder="guru1@gmail.com&#10;guru2@gmail.com">${esc((CONFIG.authorizedEmails||[]).filter(email=>email!==CONFIG.adminEmail).join('\n'))}</textarea>
+<div class="row"><button class="btn gh" onclick="saveDriveViewers()">${ic('save')}Simpan akses Drive</button></div>`:'<p class="mu sm">Pengaturan hanya dapat diubah admin.</p>'}
+</div><p class="mu sm">Email pemilik Drive tetap terpisah dari username login. Lampiran Drive memerlukan akun Google yang diberi akses.</p>`;
 return
 }
-function saveSettings(){
-saveSharedSettings()
-}
 async function saveSharedSettings(){
-const email=$('adminEmail').value.trim().toLowerCase();
-const authorizedEmails=$('authorizedEmails').value.split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
-if(!okMail(email)||authorizedEmails.some(x=>!okMail(x)))return toast('Periksa email admin dan daftar email guru.',1);
+const loginUsername=$('sharedUsername').value.trim().toLowerCase();
+if(!/^[a-z0-9._-]{3,32}$/.test(loginUsername))return toast('Username harus 3–32 karakter: huruf, angka, titik, garis bawah, atau tanda hubung.',1);
 try{
-const result=await request('updateSharedSettings',{settings:{adminEmail:email,authorizedEmails}});
-CONFIG.adminEmail=result.adminEmail;CONFIG.authorizedEmails=result.authorizedEmails;me.isAdmin=result.isAdmin;
-if(!me.isAdmin){toast('Admin diperbarui. Silakan masuk kembali menggunakan akun baru.');logout();return}
-toast('Pengaturan admin dan akses guru berhasil disimpan.');settingsView()
-}catch(e){toast(e.message||'Gagal memperbarui pengaturan bersama.',1)}
+const result=await request('updateSharedSettings',{settings:{loginUsername,authorizedEmails:CONFIG.authorizedEmails||[]}});
+CONFIG.loginUsername=result.loginUsername;me.username=result.loginUsername;
+toast('Username berhasil diperbarui.');settingsView()
+}catch(e){toast(e.message||'Gagal memperbarui username.',1)}
+}
+async function saveDriveViewers(){
+const authorizedEmails=$('authorizedEmails').value.split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+if(authorizedEmails.some(email=>!okMail(email)))return toast('Periksa alamat email Google.',1);
+try{
+const result=await request('updateSharedSettings',{settings:{loginUsername:CONFIG.loginUsername||me.username,authorizedEmails}});
+CONFIG.authorizedEmails=result.authorizedEmails;toast('Akses Google Drive berhasil diperbarui.');settingsView()
+}catch(e){toast(e.message||'Gagal memperbarui akses Drive.',1)}
+}
+async function changeSharedPassword(){
+const currentPassword=$('currentPassword').value,newPassword=$('newPassword').value;
+if(!currentPassword||newPassword.length<8)return toast('Masukkan password saat ini dan password baru minimal 8 karakter.',1);
+const user=fbAuth&&fbAuth.currentUser;
+if(!user)return toast('Sesi login tidak tersedia. Masuk kembali.',1);
+try{
+const credential=firebase.auth.EmailAuthProvider.credential(user.email,currentPassword);
+await user.reauthenticateWithCredential(credential);
+await user.updatePassword(newPassword);
+$('currentPassword').value='';$('newPassword').value='';
+toast('Password bersama berhasil diubah. Semua pengguna harus memakai password baru saat login berikutnya.')
+}catch(e){console.error('Gagal mengubah password bersama.',e);toast(e.message||'Gagal mengubah password.',1)}
 }
 
 /* Halaman Utama */
@@ -266,7 +288,7 @@ const files=await Promise.all(selectedFiles.map(fileAsBase64));
 if(files.length){const uploadResult=await request('uploadArchiveFiles',{files,dt,kind});uploadedFiles=uploadResult.driveFiles||[];cleanupToken=uploadResult.cleanupToken||''}
 const id=editingId||fbDb.ref(kind).push().key;
 const record={id,kind,nm,dt,ds:$('ds').value.trim(),pr:kind==='Pembangunan'?progress:null,
-driveFiles:retainedFiles.concat(uploadedFiles),n:retainedFiles.length+uploadedFiles.length,uploader:me.email};
+driveFiles:retainedFiles.concat(uploadedFiles),n:retainedFiles.length+uploadedFiles.length,uploader:me.username};
 await archiveRef(kind,id).set(record);
 DB=DB.filter(item=>item.id!==id);DB.unshift(record);editingId=null;
 let cleanupMessage='';
@@ -403,8 +425,10 @@ form.submit()
 })
 }
 async function request(action,payload={}){
+if(action!=='getLoginConfig'&&fbAuth&&fbAuth.currentUser)AUTH_TOKEN=await fbAuth.currentUser.getIdToken();
 if(SHARED_MODE){
 const args={
+getLoginConfig:[],
 getBootstrapData:[AUTH_TOKEN],getArchives:[AUTH_TOKEN],
 uploadArchiveFiles:[AUTH_TOKEN,payload.files,payload.dt,payload.kind],
 deleteDriveFiles:[AUTH_TOKEN,payload.fileIds].concat(payload.cleanupToken?[payload.cleanupToken]:[]),
@@ -418,41 +442,66 @@ return postApi({action,idToken:AUTH_TOKEN,...payload})
 }
 function showSignedIn(data){
 DB=Array.isArray(data.archives)?data.archives:[];
-CONFIG.adminEmail=data.adminEmail;CONFIG.authorizedEmails=data.authorizedEmails||[];
+CONFIG.adminEmail=data.adminEmail;CONFIG.loginUsername=data.username;CONFIG.authorizedEmails=data.authorizedEmails||[];
 CONNECTION={firebase:true,drive:!!(data.connection&&data.connection.drive)};
-me={email:data.email,isAdmin:!!data.isAdmin};
-$('who').textContent=me.email;$('av').textContent=me.email[0].toUpperCase();
+me={username:data.username||LOGIN_CONFIG.username,isAdmin:!!data.isAdmin};
+$('who').textContent=me.username;$('av').textContent=me.username[0].toUpperCase();
 document.querySelector('[data-v="settings"]').classList.toggle('hide',!me.isAdmin);
 $('auth').classList.add('hide');$('app').classList.remove('hide');go('dash')
 }
-async function completeSignIn(response){
-AUTH_TOKEN=response.credential;
-const status=$('sharedStatus');if(status)status.textContent='Memeriksa akun dan mengambil data arsip…';
+async function establishSignedIn(user){
+AUTH_TOKEN=await user.getIdToken();
 try{
 const bootstrap=await request('getBootstrapData');
-const credential=firebase.auth.GoogleAuthProvider.credential(response.credential);
-const signedIn=await fbAuth.signInWithCredential(credential);
-if(String(signedIn.user.email||'').toLowerCase()!==String(bootstrap.email||'').toLowerCase())throw new Error('Akun Firebase tidak cocok dengan akun Google yang diizinkan.');
 bootstrap.archives=await migrateLegacyArchives(bootstrap.archives||[]);
 bootstrap.connection=Object.assign({},bootstrap.connection,{drive:!!(bootstrap.connection&&bootstrap.connection.drive)});
 showSignedIn(bootstrap);
-} 
-catch(e){console.error('Gagal membuka aplikasi bersama.',e);if(status)status.textContent=e.message||'Akun belum diizinkan membuka arsip.'}
+}catch(e){console.error('Gagal membuka aplikasi bersama.',e);throw e}
 }
-function initializeSignIn(){
+async function login(){
+const button=$('loginButton'),status=$('sharedStatus');
+const username=$('loginUsername').value.trim().toLowerCase(),password=$('loginPassword').value;
+if(!username||!password){status.textContent='Masukkan username dan password.';return}
+if(button){button.disabled=true;button.textContent='Memeriksa akun…'}
+status.textContent='Memeriksa akun dan mengambil data arsip…';
+try{
+if(!LOGIN_CONFIG)LOGIN_CONFIG=await request('getLoginConfig');
+if(!LOGIN_CONFIG.ready)throw new Error('Login belum dikonfigurasi. Periksa Script Properties dan Firebase Authentication.');
+if(username!==LOGIN_CONFIG.username)throw new Error('Username atau password salah.');
+await fbAuth.signInWithEmailAndPassword(LOGIN_CONFIG.loginEmail,password);
+$('loginPassword').value='';
+}catch(e){
+console.error('Login akun bersama gagal.',e);
+const credentialError=['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email'].includes(e.code);
+status.textContent=credentialError?'Username atau password salah.':(e.message||'Login gagal.');
+if(button){button.disabled=false;button.textContent='Masuk'}
+}
+}
+async function initializeSignIn(){
 const fc=CONFIG.firebaseConfig||{},firebaseReady=['apiKey','authDomain','databaseURL','projectId','appId'].every(key=>fc[key]&&!String(fc[key]).includes('YOUR_'));
-if(!CONFIG.googleClientId||String(CONFIG.googleClientId).includes('YOUR_')||(!SHARED_MODE&&(!CONFIG.apiUrl||String(CONFIG.apiUrl).includes('YOUR_')))||!firebaseReady){
-$('sharedStatus').textContent='Konfigurasi belum lengkap: isi Google Client ID, URL Web App, dan Firebase config pada window.ARSIP_CONFIG.';
+if((!SHARED_MODE&&(!CONFIG.apiUrl||String(CONFIG.apiUrl).includes('YOUR_')))||!firebaseReady){
+$('sharedStatus').textContent='Konfigurasi belum lengkap: periksa URL Web App dan Firebase config.';
 return
 }
 if(!window.firebase){$('sharedStatus').textContent='Firebase SDK belum termuat. Periksa koneksi lalu muat ulang.';return}
 try{
 if(!firebase.apps.length)firebase.initializeApp(fc);
 fbAuth=firebase.auth();fbDb=firebase.database();
-}catch(e){console.error('Gagal menginisialisasi Firebase.',e);$('sharedStatus').textContent='Inisialisasi Firebase gagal: '+(e.message||'periksa konfigurasi.');return}
-if(!window.google||!google.accounts||!google.accounts.id){$('sharedStatus').textContent='Layanan login Google belum termuat. Periksa koneksi lalu muat ulang.';return}
-google.accounts.id.initialize({client_id:CONFIG.googleClientId,callback:completeSignIn,auto_select:false});
-google.accounts.id.renderButton($('googleSignIn'),{theme:'outline',size:'large',text:'signin_with',locale:'id'})
+LOGIN_CONFIG=await request('getLoginConfig');
+if(!LOGIN_CONFIG.ready)throw new Error('Login belum dikonfigurasi. Periksa Script Properties dan Firebase Authentication.');
+$('loginUsername').placeholder='Username';
+fbAuth.onAuthStateChanged(async user=>{
+if(!user)return;
+const status=$('sharedStatus');if(status)status.textContent='Memuat data arsip…';
+try{await establishSignedIn(user)}
+catch(e){
+console.error('Sesi akun bersama tidak valid.',e);
+await fbAuth.signOut();
+if(status)status.textContent=e.message||'Sesi login tidak valid. Masuk kembali.';
+const button=$('loginButton');if(button){button.disabled=false;button.textContent='Masuk'}
+}
+});
+}catch(e){console.error('Gagal menginisialisasi login bersama.',e);$('sharedStatus').textContent=e.message||'Inisialisasi login gagal.'}
 }
 window.addEventListener('load',initializeSignIn);
 </script></body></html>
