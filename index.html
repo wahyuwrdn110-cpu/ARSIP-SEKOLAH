@@ -259,7 +259,7 @@ $('add').innerHTML=hd('','on','')+`<div class="card"><b>${p?'Detail Proyek & Fot
 ${p?`<label>Progres: <span id="pv">${record&&record.pr!=null?Number(record.pr):0}</span>%</label><input type="range" id="pr" min="0" max="100" step="1" value="${record&&record.pr!=null?Number(record.pr):0}" oninput="$('pv').textContent=this.value">`:''}
 ${record?`<label>Berkas lama</label><p class="mu sm">Berkas yang tidak dipilih akan tetap tersimpan. Tandai berkas untuk dihapus atau diganti, lalu pilih berkas baru di bawah.</p>
 <div class="file-list">${files.map(f=>`<label class="file-item"><input type="checkbox" class="remove-old-file" value="${esc(f.id)}"><span>${esc(f.name||'Berkas tanpa nama')}</span></label>`).join('')||'<span class="mu sm">Belum ada berkas lama.</span>'}</div>`:''}
-<label>Foto atau dokumen</label><input type="file" id="fo" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" multiple>
+<label>Foto atau dokumen</label><input type="file" id="fo" accept="image/*,application/pdf" multiple><p class="mu sm">Mendukung JPEG, PNG, GIF, WebP, HEIC/HEIF, dan PDF. Maksimal 10 berkas, total 10 MB per arsip.</p>
 <div class="path" id="path"></div>
 <div class="row"><button class="btn" onclick="save()">${ic('save')}${record?'Simpan perubahan':'Simpan ke Drive &amp; Firebase'}</button><button class="btn gh" onclick="addView()">${ic('back')}Kembali</button></div></div>`;updPath()}
 function updPath(){$('path').textContent='Drive bersama sekolah › /'+($('dt').value||'Tahun').slice(0,4)+'/'+(kind==='Kegiatan_Sekolah'?'Kegiatan Sekolah':'Pembangunan')+'/'}
@@ -272,7 +272,8 @@ const progress=kind==='Pembangunan'?Number($('pr').value):null;
 if(kind==='Pembangunan'&&(!Number.isInteger(progress)||progress<0||progress>100))return toast('Progres harus 0–100%.',1);
 const files=[...$('fo').files];
 if(files.length>10||files.reduce((n,f)=>n+f.size,0)>10*1024*1024)return toast('Maksimal 10 berkas dan total ukuran 10 MB.',1);
-if(files.some(f=>!['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(f.type)))return toast('Tipe berkas tidak diizinkan.',1);
+const allowedTypes=['image/jpeg','image/png','image/gif','image/webp','image/heic','image/heif','application/pdf'];
+if(files.some(f=>!allowedTypes.includes(uploadMimeType(f))))return toast('Format foto/dokumen tidak didukung. Gunakan JPEG, PNG, GIF, WebP, HEIC/HEIF, atau PDF.',1);
 const oldRecord=editingId&&DB.find(item=>item.id===editingId),removeIds=[...document.querySelectorAll('.remove-old-file:checked')].map(input=>input.value);
 if(editingId&&!oldRecord)return toast('Arsip yang akan diedit tidak ditemukan. Muat ulang data lalu coba lagi.',1);
 const retained=oldRecord?fileList(oldRecord).filter(file=>!removeIds.includes(String(file.id))):[];
@@ -280,7 +281,15 @@ if(retained.length+files.length>10)return toast('Maksimal 10 berkas per arsip. H
 await saveSharedArchive(nm,dt,files,progress,retained,removeIds)
 }
 async function fileAsBase64(file){
-return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type,data:String(reader.result).split(',')[1]||''});reader.onerror=()=>reject(reader.error||new Error('Gagal membaca berkas.'));reader.readAsDataURL(file)})
+return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:uploadMimeType(file),data:String(reader.result).split(',')[1]||''});reader.onerror=()=>reject(reader.error||new Error('Gagal membaca berkas.'));reader.readAsDataURL(file)})
+}
+function uploadMimeType(file){
+const type=String(file.type||'').toLowerCase();
+if(type==='image/jpg')return 'image/jpeg';
+const extensions={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',heic:'image/heic',heif:'image/heif',pdf:'application/pdf'};
+if(['image/jpeg','image/png','image/gif','image/webp','image/heic','image/heif','application/pdf'].includes(type))return type;
+const extension=String(file.name||'').toLowerCase().split('.').pop();
+return extensions[extension]||type;
 }
 async function saveSharedArchive(nm,dt,selectedFiles,progress,retainedFiles,removedFileIds){
 const button=$('add').querySelector('.btn');if(button){button.disabled=true;button.textContent='Mengunggah ke Drive…'}
@@ -490,6 +499,8 @@ if(!window.firebase){$('sharedStatus').textContent='Firebase SDK belum termuat. 
 try{
 if(!firebase.apps.length)firebase.initializeApp(fc);
 fbAuth=firebase.auth();fbDb=firebase.database();
+await fbAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+await fbAuth.signOut();
 LOGIN_CONFIG=await request('getLoginConfig');
 if(!LOGIN_CONFIG.ready)throw new Error('Login belum dikonfigurasi. Periksa Script Properties dan Firebase Authentication.');
 $('loginUsername').placeholder='Username';
